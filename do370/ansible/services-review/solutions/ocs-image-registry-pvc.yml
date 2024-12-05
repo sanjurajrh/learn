@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: ocs-image-registry-storage
+  namespace: openshift-image-registry
+spec:
+  accessModes:
+   - ReadWriteMany
+  storageClassName: ocs-storagecluster-cephfs
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 100Gi

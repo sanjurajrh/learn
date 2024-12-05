@@ -1,0 +1,18 @@
+---
+- name: Label nodes for OCS storage
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+
+  roles:
+    - role: ocp-label-node
+      nodes: "{{ storage_nodes }}"
+      labels:
+        - "node-role.kubernetes.io/infra: null"
+        - "node-role.kubernetes.io/worker: ''"
+        - "cluster.ocs.openshift.io/openshift-storage: ''"

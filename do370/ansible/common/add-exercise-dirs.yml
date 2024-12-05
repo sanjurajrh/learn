@@ -1,0 +1,34 @@
+---
+- name: Add exercise directories
+  hosts: localhost
+  become: True
+  gather_facts: False
+  vars:
+    sku: DO370
+    base_dir: /home/student/{{ sku | upper }}
+
+  tasks:
+    - name: Fail if exercise is undefined
+      fail:
+        msg: The "exercise" variable must be defined.
+      when: exercise is not defined
+
+    - name: Ensure course directory exists
+      file:
+        path: "{{ base_dir }}"
+        state: directory
+        owner: student
+        group: student
+        mode: '0775'
+
+    - name: Create content
+      copy:
+        src: "../{{ exercise['name'] }}/{{ item }}/"
+        dest: "{{ base_dir }}/{{ item }}/{{ exercise['name'] }}/"
+        owner: student
+        group: student
+        mode: preserve
+        directory_mode: '0775'
+      loop: "{{ exercise['dirs'] }}"
+      loop_control:
+        label: Creating content at "{{ base_dir }}/{{ item }}/{{ exercise['name'] }}"

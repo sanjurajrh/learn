@@ -1,0 +1,32 @@
+---
+- name: Remove resource
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+
+  tasks:
+    - name: Remove specified resource
+      kubernetes.core.k8s:
+        state: absent
+        api_version: "{{ api_version | default('v1') }}"
+        name: "{{ resource_name }}"
+        namespace: "{{ namespace | default(omit) }}"
+        kind: "{{ resource_kind }}"
+      register: remove_resource
+
+    - name: Verify resource removal
+      kubernetes.core.k8s_info:
+        api_version: "{{ api_version | default('v1') }}"
+        name: "{{ resource_name }}"
+        namespace: "{{ namespace | default(omit) }}"
+        kind: "{{ resource_kind }}"
+      register: monitor_resource
+      retries: 40
+      delay: 3
+      until: monitor_resource['resources'] | length == 0
+      when: remove_resource['changed']

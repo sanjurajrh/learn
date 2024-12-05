@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ operator['namespace']['name'] }}
+{% if operator['namespace']['labels'] is defined %}
+  labels:
+  {% for label in operator['namespace']['labels'] %}
+    {{ label }}
+  {% endfor %}
+{% endif %}

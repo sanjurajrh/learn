@@ -1,0 +1,116 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awscli
+  namespace: object-monitor
+  labels:
+    app: awscli
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awscli
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: awscli
+    spec:
+      initContainers:
+      - name: clean
+        image: quay.io/redhattraining/aws-cli:2.2.5
+        command:
+        - bash
+        - -c
+        - 'aws s3 rm s3://${BUCKET_NAME}/ --endpoint-url="https://${BUCKET_HOST}" --recursive --quiet'
+        env:
+        - name: AWS_CA_BUNDLE
+          value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        envFrom:
+        - configMapRef:
+            name: object-bucket
+        - secretRef:
+            name: object-bucket
+        resources: {}
+      containers:
+      - name: awscli
+        image: quay.io/redhattraining/aws-cli:2.2.5
+        command:
+        - /opt/entrypoint.sh
+        env:
+        - name: AWS_CA_BUNDLE
+          value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        envFrom:
+        - configMapRef:
+            name: object-bucket
+        - secretRef:
+            name: object-bucket
+        - configMapRef:
+            name: settings
+        resources: {}
+        volumeMounts:
+        - name: entrypoint
+          mountPath: /opt
+          subpath: entrypoint.sh
+      volumes:
+      - name: entrypoint
+        configMap:
+          name: entrypoint
+          defaultMode: 0555
+status: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: object-monitor
+  labels:
+    app: awscli
+data:
+  SECS: "0"
+  BLOCK_SIZE: "1M"
+  COUNT: "1"
+  STEP: "1"
+  OFFSET: "2"
+  MAX: "999"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: entrypoint
+  namespace: object-monitor
+  labels:
+    app: awscli
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -eu
+    set -o pipefail
+    ENDPOINT=https://${BUCKET_HOST}
+
+    while
+      date
+      echo "==> Listing bucket <=="
+      aws s3 ls s3://${BUCKET_NAME} --endpoint-url "${ENDPOINT}" --recursive --summarize --human-readable
+    do
+      if [ ${COUNT} -lt ${MAX} ]
+      then
+        OBJECT=$(printf "%s-%03d" "object" "${COUNT}")
+        echo "==> Copying '${OBJECT}' to S3 bucket <=="
+        dd if=/dev/urandom bs=${BLOCK_SIZE} count=${COUNT} | \
+          aws s3 cp - s3://${BUCKET_NAME}/${OBJECT} --endpoint-url "${ENDPOINT}"
+        THRESHOLD=$((${OFFSET}*${STEP}))
+        if [ ${COUNT} -gt ${THRESHOLD} ]
+        then
+          OBJECT=$(printf "%s-%03d" "object" "$((${COUNT}-${THRESHOLD}))")
+          echo "==> Reading '${OBJECT}' from S3 bucket <=="
+          aws s3 cp s3://${BUCKET_NAME}/${OBJECT} - --endpoint-url "${ENDPOINT}" | \
+            md5sum - | \
+            awk -v name="${OBJECT}" '{print $1 "\t" name}'
+        fi
+        COUNT=$((${COUNT}+${STEP}))
+      fi
+      sleep ${SECS}
+      printf "%s\n" "--"
+    done

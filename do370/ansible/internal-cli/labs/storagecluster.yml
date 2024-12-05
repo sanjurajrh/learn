@@ -1,0 +1,22 @@
+---
+apiVersion: ocs.openshift.io/v1
+kind: StorageCluster
+metadata:
+  name: CHANGE_ME
+  namespace: openshift-storage
+spec:
+  monDataDirHostPath: /var/lib/rook
+  storageDeviceSets:
+  - count: 1
+    dataPVCTemplate:
+      spec:
+        accessModes:
+        - CHANGE_ME
+        resources:
+          requests:
+            storage: "1"
+        storageClassName: CHANGE_ME
+        volumeMode: CHANGE_ME
+    name: CHANGE_ME
+    replica: 3
+  version: 4.7.0

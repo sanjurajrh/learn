@@ -1,0 +1,11 @@
+---
+# defaults file for certs-ca
+ca_cert_path: /etc/pki/tls/certs
+ca_private_path: /etc/pki/tls/private
+organization_name: Red Hat, Inc.
+organizational_unit_name: Training
+locality_name: Raleigh
+state_or_province_name: NC
+country_name: US
+ca_cert_name: classroom-ca
+ca_comment: GLS Training Classroom Certificate Authority

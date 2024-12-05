@@ -1,0 +1,123 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: object-bucket
+  namespace: object-define
+spec:
+  generateBucketName: object-bucket
+  storageClassName: ocs-storagecluster-ceph-rgw
+  # storageClassName: openshift-storage.noobaa.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-cli
+  namespace: object-define
+  labels:
+    app: s3-cli
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: s3-cli
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: s3-cli
+    spec:
+      initContainers:
+      - name: init
+        image: registry.access.redhat.com/ubi8/python-39
+        command:
+        - /opt/entrypoint.sh
+        workingDir: /home/user
+        envFrom:
+        - configMapRef:
+            name: settings
+        - configMapRef:
+            name: object-bucket
+        volumeMounts:
+        - mountPath: /home/user
+          name: home-dir
+        - name: entrypoint
+          mountPath: /opt
+          subpath: entrypoint.sh
+      containers:
+      - name: s3-cli
+        image: registry.access.redhat.com/ubi8/python-39
+        restartPolicy: Never
+        command:
+        - sleep
+        - "3600"
+        workingDir: /home/user
+        envFrom:
+        - configMapRef:
+            name: settings
+        - configMapRef:
+            name: object-bucket
+        - secretRef:
+            name: object-bucket
+        volumeMounts:
+        - mountPath: /home/user
+          name: home-dir
+        resources: {}
+      volumes:
+      - name: home-dir
+        emptyDir: {}
+      - name: entrypoint
+        configMap:
+          name: entrypoint
+          defaultMode: 0555
+status: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: object-define
+  labels:
+    app: s3-cli
+data:
+  HOME: /home/user
+  PATH: /home/user/.local/bin:/home/user/local/bin:/home/user/bin:/opt/app-root/bin:/opt/app-root/src/.local/bin:/opt/app-root/src/bin:/opt/app-root/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
+  AWS_CA_BUNDLE: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: entrypoint
+  namespace: object-define
+  labels:
+    app: s3-cli
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -eu
+    set -o pipefail
+
+    case "${BUCKET_PORT}"
+    in
+      80)
+        BUCKET_PROTO=http
+        ;;
+      443)
+        BUCKET_PROTO=https
+        ;;
+      *)
+        exit -1
+        ;;
+    esac
+
+    pip3 config  --user set global.progress_bar off
+    pip3 install --user --upgrade pip awscli awscli-plugin-endpoint s3cmd
+
+    aws configure set plugins.endpoint awscli_plugin_endpoint
+    for SUBCOMMAND in s3 s3api
+    do
+      aws configure set ${SUBCOMMAND}.endpoint_url "${BUCKET_PROTO}://${BUCKET_HOST}:${BUCKET_PORT}"
+      aws configure set ${SUBCOMMAND}.ca_bundle ${AWS_CA_BUNDLE}
+    done
+
+    cat ~/.aws/config

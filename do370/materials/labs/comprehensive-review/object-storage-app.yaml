@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: image-tool-compreview-object
+  name: image-tool-compreview-object
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-tool-compreview-object
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: image-tool-compreview-object
+    spec:
+      containers:
+      - name: image-tool-compreview-object
+        image: quay.io/redhattraining/image-tool:latest
+        ports:
+        - containerPort: 5000
+        resources: {}
+        env:
+          - name: AWS_CA_BUNDLE
+            value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+#        envFrom:
+#        - configMapRef:
+#            name: image-object-bucket
+#        - secretRef:
+#            name: image-object-bucket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: image-tool-compreview-object
+  name: image-tool-compreview-object
+spec:
+  ports:
+  - name: image-tool-compreview-object
+    port: 80
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: image-tool-compreview-object
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: image-tool-compreview-object
+  name: image-tool-compreview-object
+spec:
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: image-tool-compreview-object
+    weight: null

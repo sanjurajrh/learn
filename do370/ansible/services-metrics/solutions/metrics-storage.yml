@@ -1,0 +1,15 @@
+prometheusK8s:
+  retention: 7d
+  volumeClaimTemplate:
+    spec:
+      storageClassName: ocs-storagecluster-ceph-rbd
+      resources:
+        requests:
+          storage: 40Gi
+alertmanagerMain:
+  volumeClaimTemplate:
+    spec:
+      storageClassName: ocs-storagecluster-ceph-rbd
+      resources:
+        requests:
+          storage: 20Gi

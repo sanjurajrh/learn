@@ -1,0 +1,137 @@
+---
+user_kubeconfig:
+  file: /home/lab/.kube/config
+  remote: True
+
+control_nodes:
+  - master01
+  - master02
+  - master03
+
+storage_nodes:
+  - worker01
+  - worker02
+  - worker03
+
+operators:
+  lso:
+    name: "local-storage-operator"
+    namespace:
+      name: "openshift-local-storage"
+    operator_group: "openshift-local-storage"
+    channel: "4.7"
+    source: "redhat-operators"
+  
+  ocs:
+    name: "ocs-operator"
+    namespace:
+      name: "openshift-storage"
+      labels:
+        - "openshift.io/cluster-monitoring: 'true'"
+    operator_group: "openshift-storage"
+    channel: "stable-4.7"
+    source: "redhat-operators"
+
+  oadp:
+    name: "oadp-operator"
+    namespace:
+      name: "oadp-operator"
+    operator_group: "oadp-operator"
+    channel: "alpha"
+    source: "community-operators"
+
+default_cluster_service_storage:
+  prometheusK8s:
+    retention: 3d
+    storage: 20Gi
+    storageClassName: ocs-storagecluster-ceph-rbd
+
+  alertmanagerMain:
+    storage: 10Gi
+    storageClassName: ocs-storagecluster-ceph-rbd
+
+localvolumeset:
+  name: lso-volumeset
+  namespace: "{{ operators['lso']['namespace']['name'] }}"
+  deviceTypes:
+    - disk
+    - part
+  minSize: 0Ti
+  storageClassName: lso-volumeset
+  volumeMode: Block
+  nodes: "{{ storage_nodes }}"
+
+storagecluster:
+  name: ocs-storagecluster
+  namespace: "{{ operators['ocs']['namespace']['name'] }}"
+  encryption: False
+  storageDeviceSets:
+    count: 1
+    accessModes:
+      - ReadWriteOnce
+    storage: 1
+  replica: 3
+  version: "4.7.0"
+
+registry:
+  claim: registry-claim
+  defaultRoute: False
+  managementState: Unmanaged
+  pvc:
+    name: cephfs-image-registry-storage
+    defaultRoute: True
+    managementState: Unmanaged
+    accessModes:
+      - ReadWriteMany
+    storage: 100Gi
+    storageClassName: ocs-storagecluster-cephfs
+    volumeMode: Filesystem
+  obc:
+    name: noobaa-registry
+    generateBucketName: noobaa-registry
+    bucketclass: noobaa-default-bucket-class
+    managementState: Managed
+    storageClassName: openshift-storage.noobaa.io
+
+volumes_block:
+  namespace:
+    name: volumes-block
+  secret:
+    name: mysql-vars
+    data:
+      - key: USER
+        value: myuser
+      - key: PASSWORD
+        value: redhat123
+      - key: ROOT_PASSWORD
+        value: r00tpa55
+  no_expand:
+    name: mysql-no-expand
+    image: "registry.redhat.io/rhel8/mysql-80:1-116"
+    database:
+      name: games
+      table: olympics
+      sql_file: games-olympics.sql
+    pvc:
+      name: mysql-no-expand-pvc
+      accessModes:
+        - ReadWriteOnce
+      storage_size: 1G
+      storageClassName: nfs-storage
+      volumeMode: Filesystem
+      mount_path: /var/lib/mysql/data
+  expand:
+    name: mysql-expand
+    image: "registry.redhat.io/rhel8/mysql-80:1-116"
+    database:
+      name: fifa
+      table: worldcup
+      sql_file: fifa-worldcup.sql
+    pvc:
+      name: mysql-expand-pvc
+      accessModes:
+        - ReadWriteOnce
+      storage_size: 1G
+      storageClassName: ocs-storagecluster-ceph-rbd
+      volumeMode: Filesystem
+      mount_path: /var/lib/mysql/data

@@ -1,0 +1,31 @@
+---
+ocp_cluster:
+  host: "https://api.ocp4.example.com:6443"
+  kubeconfig: /home/lab/ocp4/auth/kubeconfig
+  validate_certs: False
+  users:
+    - username: admin
+      password: redhat
+      cluster_role: cluster-admin
+    - username: developer
+      password: developer
+
+# defaults file for ocp-control-plane-certs
+ca_cert_file: /etc/pki/tls/certs/classroom-ca.pem
+ca_private_key: /etc/pki/tls/private/classroom-ca-key.pem
+cert_path: /tmp/certs
+organization_name: Red Hat, Inc.
+organizational_unit_name: Training
+locality_name: Raleigh
+state_or_province_name: NC
+country_name: US
+# Replace with your wildcard_domain. This can be found with:
+# oc get ingresses.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
+wildcard_domain: apps.ocp4.example.com
+configure_api: True
+cert_name: wildcard
+combined_name: wildcard-combined
+cert_comment: "Classroom {% if configure_api | bool == True %}Wildcard & API{% else %}Wildcard{% endif %} Certificate"
+default_user: student
+not_after: "+3650d"
+update_cert: False

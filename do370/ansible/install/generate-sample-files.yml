@@ -1,0 +1,99 @@
+---
+- name: Generate sample YAML files
+  hosts: localhost
+  become: True
+  gather_facts: False
+  vars:
+    base_dir: /home/student/DO370
+    exercise_dir: install-ocs
+  tasks:
+    - name: Include inventory variables
+      include_vars: ../inventory/host_vars/utility
+
+    - name: Ensure exercise directories exists.
+      vars:
+        operator: "{{ item }}"
+      file:
+        path: "{{ base_dir }}/{{ item }}/{{ exercise_dir }}"
+        state: directory
+        recurse: True
+        owner: student
+        group: student
+        mode: '0775'
+      loop:
+        - labs
+        - solutions
+      loop_control:
+        label: Creating directory {{ base_dir }}/{{ item }}/{{ exercise_dir }}/
+
+    - name: Generate namespace examples
+      vars:
+        operator: "{{ item }}"
+        operator_base: "{% if item['name'] == 'local-storage-operator' %}lso{% else %}ocs{% endif %}"
+      template:
+        src: templates/namespace.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-namespace.yml"
+        owner: student
+        group: student
+        mode: '0664'
+      loop:
+        - "{{ operators['lso'] }}"
+        - "{{ operators['ocs'] }}"
+      loop_control:
+        label: Creating {{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-namespace.yml
+
+    - name: Generate operator group examples
+      vars:
+        operator: "{{ item }}"
+        operator_base: "{% if item['name'] == 'local-storage-operator' %}lso{% else %}ocs{% endif %}"
+      template:
+        src: templates/operatorgroup.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-operatorgroup.yml"
+        owner: student
+        group: student
+        mode: '0664'
+      loop:
+        - "{{ operators['lso'] }}"
+        - "{{ operators['ocs'] }}"
+      loop_control:
+        label: Creating {{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-operatorgroup.yml
+
+    - name: Generate subscription examples
+      vars:
+        operator: "{{ item }}"
+        operator_base: "{% if item['name'] == 'local-storage-operator' %}lso{% else %}ocs{% endif %}"
+      template:
+        src: templates/subscription.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-subscription.yml"
+        owner: student
+        group: student
+        mode: '0664'
+      loop:
+        - "{{ operators['lso'] }}"
+        - "{{ operators['ocs'] }}"
+      loop_control:
+        label: Creating {{ base_dir }}/solutions/{{ exercise_dir }}/{{ operator_base }}-subscription.yml
+
+    - name: Generate local volume discovery example
+      template:
+        src: templates/auto-discover-devices.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/localvolumediscovery.yml"
+        owner: student
+        group: student
+        mode: '0664'
+
+    - name: Generate local volume set example
+      template:
+        src: templates/localvolumeset.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/localvolumeset.yml"
+        owner: student
+        group: student
+        mode: '0664'
+
+    - name: Generate storage cluster example
+      template:
+        src: templates/storagecluster.j2
+        dest: "{{ base_dir }}/solutions/{{ exercise_dir }}/storagecluster.yml"
+        owner: student
+        group: student
+        mode: '0664'

@@ -1,0 +1,59 @@
+== Initial Steps
+
+[source,bash]
+----
+$ mkdir ~/Curriculum/
+$ cd ~/Curriculum/
+$ git clone git@github.com:RedHatTraining/DO370
+$ cd ~/Curriculum/DO370
+----
+
+== Preparing the classroom environment for DynoLabs
+
+Configure your classroom environment so that it can run python lab scripts.
+Eventually, the branches listed below will be merge into master/main.
+You will likely follow a similar process as you develop in your own branches.
+
+[source,bash]
+----
+$ cd
+$ git clone git@github.com:RedHatTraining/rht-labs-core
+$ git clone git@github.com:RedHatTraining/rht-labs-ocp
+$ make venv
+$ source ~/.venv/rht-labs-core/bin/activate
+$ cd
+$ pip3 install -e ~/rht-labs-core
+$ pip3 install -e ~/rht-labs-ocp
+$ pip3 install -e ~/Curriculum/DO370/classroom/grading
+$ lab completion bash | sudo tee /etc/bash_completion.d/lab
+$ source /etc/bash_completion.d/lab
+$ lab select do370
+----
+
+== Recommended Steps on a Fresh Environment
+
+In our classroom environment, the `kube-apiserver` cluster operator typically starts in a progressing state.
+You might decide to wait until it is no longer progressing.
+Be aware that this might take between 10-15 minutes after the classroom environment starts.
+
+If the `operator-lifecycle-manager-packageserver` cluster operator is progressing, delete the packageserver pods in the `openshift-operator-lifecycle-manager` namespace.
+Failure to do this results in operators not being displayed from OperatorHub section of the web console.
+Additionally, tab completion for the `oc` command will not work as expected.
+
+[source,bash]
+----
+$ oc login -u admin -p redhat https://api.ocp4.example.com:6443 --insecure-skip-tls-verify
+$ watch oc get co # Wait until the kube-apiserver cluster operator is no longer progressing
+$ oc delete pods -l app=packageserver -n openshift-operator-lifecycle-manager
+----
+
+== Install & Configure OpenShift Container Storage with a Start Script
+
+After chapter 2, most lab scripts will likely do something similar to the `services-registry.py` script.
+This script installs and configures OpenShift Container Storage.
+
+[source,bash]
+----
+$ time lab start services-registry # This takes about 6 minutes to complete.
+$ lab finish services-registry # Your environment is now configured to use OCS
+----

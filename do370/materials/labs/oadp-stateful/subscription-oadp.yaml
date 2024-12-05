@@ -1,0 +1,15 @@
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: CHANGE_ME
+  namespace: CHANGE_ME
+  labels:
+    operators.coreos.com/oadp-operator.oadp-operator: ""
+spec:
+  name: CHANGE_ME
+  channel: alpha
+  installPlanApproval: Automatic
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: oadp-operator.v0.2.3

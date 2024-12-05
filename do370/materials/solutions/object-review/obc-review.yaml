@@ -1,0 +1,11 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: object-review
+  namespace: bucket-review
+  labels:
+    app: photo-album
+spec:
+  generateBucketName: object-review
+  storageClassName: ocs-storagecluster-ceph-rgw

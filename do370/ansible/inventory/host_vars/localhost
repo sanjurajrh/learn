@@ -1,0 +1,28 @@
+exercises:
+  internal_cli:
+    name: internal-cli
+    dirs:
+      - labs
+      - solutions
+
+  internal_gui:
+    name: internal-gui
+    dirs:
+      - solutions
+
+  services_registry:
+    name: services-registry
+    dirs:
+      - labs
+      - solutions
+
+  services_metrics:
+    name: services-metrics
+    dirs:
+      - labs
+      - solutions
+
+  volumes_block:
+    name: volumes-block
+    dirs:
+      - labs

@@ -1,0 +1,16 @@
+---
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: wordpress-stateful
+  namespace: oadp-operator
+spec:
+  backupName: wordpress-stateful
+  restorePVs: true
+  excludedResources:
+  - nodes
+  - events
+  - events.events.k8s.io
+  - backups.velero.io
+  - restores.velero.io
+  - resticrepositories.velero.io

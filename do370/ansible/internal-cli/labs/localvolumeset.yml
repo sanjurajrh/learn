@@ -1,0 +1,24 @@
+---
+apiVersion: local.storage.openshift.io/v1alpha1
+kind: LocalVolumeSet
+metadata:
+  name: lso-volumeset
+  namespace: CHANGE_ME
+spec:
+  deviceInclusionSpec:
+    deviceTypes:
+    - disk
+    - part
+    minSize: 0Ti
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: kubernetes.io/hostname
+        operator: In
+        values:
+        - CHANGE_ME
+        - CHANGE_ME
+        - CHANGE_ME
+  storageClassName: lso-volumeset
+  volumeMode: Block
+  maxDeviceCount: 1

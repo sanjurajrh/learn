@@ -1,0 +1,11 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: image-object-bucket
+  namespace: comprehensive-review
+  labels:
+    app: comprehensive-review
+spec:
+  generateBucketName: object-bucket
+  storageClassName: ocs-storagecluster-ceph-rgw

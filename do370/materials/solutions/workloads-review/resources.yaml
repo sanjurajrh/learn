@@ -1,0 +1,85 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:anyuid
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+- kind: ServiceAccount
+  name: mariadb
+  namespace: workloads-review
+- kind: ServiceAccount
+  name: wordpress
+  namespace: workloads-review
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:restricted
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:restricted
+subjects:
+- kind: ServiceAccount
+  name: mariadb
+  namespace: workloads-review
+- kind: ServiceAccount
+  name: wordpress
+  namespace: workloads-review
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb
+  namespace: workloads-review
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wordpress
+  namespace: workloads-review
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb
+  namespace: workloads-review
+data:
+  MYSQL_DATABASE: exampledb
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress
+  namespace: workloads-review
+data:
+  WORDPRESS_DB_HOST: mariadb
+  WORDPRESS_DB_NAME: exampledb
+  WORDPRESS_EMAIL: wordpress@localhost.local
+  WORDPRESS_TITLE: "WordPress"
+  WORDPRESS_URL: "https://wordpress-workloads-review.apps.ocp4.example.com"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb
+  namespace: workloads-review
+data:
+  MYSQL_USER: ZXhhbXBsZXVzZXI=
+  MYSQL_PASSWORD: ZXhhbXBsZXBhc3M=
+  MYSQL_RANDOM_ROOT_PASSWORD: MQ==
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wordpress
+  namespace: workloads-review
+data:
+  WORDPRESS_USER: YWRtaW4=
+  WORDPRESS_PASSWORD: d29yZHByZXNz
+  WORDPRESS_DB_USER: ZXhhbXBsZXVzZXI=
+  WORDPRESS_DB_PASSWORD: ZXhhbXBsZXBhc3M=

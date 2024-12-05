@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ exercise['namespace']['name'] }}
+{% if exercise['namespace']['annotations'] is defined %}
+  annotations:
+  {% for annotation in exercise['namespace']['annotations'] %}
+    {{ annotation }}
+  {% endfor %}
+{% endif %}
+{% if exercise['namespace']['labels'] is defined %}
+  labels:
+  {% for label in exercise['namespace']['labels'] %}
+    {{ label }}
+  {% endfor %}
+{% endif %}

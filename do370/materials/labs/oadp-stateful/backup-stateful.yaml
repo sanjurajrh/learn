@@ -1,0 +1,12 @@
+---
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: wordpress-stateful
+  namespace: CHANGE_ME
+  labels:
+    velero.io/storage-location: default
+spec:
+  includedNamespaces:
+  - CHANGE_ME
+  storageLocation: default

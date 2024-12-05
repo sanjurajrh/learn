@@ -1,0 +1,7 @@
+---
+- name: Remove exercise directories
+  hosts: localhost
+  become: True
+  gather_facts: False
+  roles:
+    - role: remove-exercise-dirs

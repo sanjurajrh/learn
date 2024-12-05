@@ -1,0 +1,4 @@
+---
+# handlers file for certs-ca
+- name: update-ca-trust
+  command: /usr/bin/update-ca-trust extract

@@ -1,0 +1,107 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: bucket-review
+  labels:
+    app: awscli
+data:
+  PREFIX: prefix
+  SECS: "0"
+  BLOCK_SIZE: "1M"
+  COUNT: "1"
+  STEP: "1"
+  OFFSET: "2"
+  MAX: "999"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: init
+  namespace: bucket-review
+  labels:
+    app: awscli
+data:
+  init.sh: |
+    #!/bin/bash
+    set -eu
+    set -o pipefail
+
+    case "${BUCKET_PORT}"
+    in
+      80)
+        BUCKET_PROTO=http
+        ;;
+      443)
+        BUCKET_PROTO=https
+        ;;
+      *)
+        exit -1
+        ;;
+    esac
+
+    ENDPOINT="${BUCKET_PROTO}://${BUCKET_HOST}:${BUCKET_PORT}"
+
+    echo "==> Deleting all objects from prefix: ${PREFIX} <=="
+    aws s3 rm s3://${BUCKET_NAME}/${PREFIX} --endpoint-url="${ENDPOINT}" --recursive
+
+    echo "==> Creating prefix: ${PREFIX} <=="
+    aws s3api put-object --bucket ${BUCKET_NAME} --key ${PREFIX} --endpoint-url "${ENDPOINT}"
+
+    echo "==> Listing bucket <=="
+    aws s3 ls s3://${BUCKET_NAME}/${PREFIX} --endpoint-url "${ENDPOINT}" --recursive --summarize --human-readable
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: entrypoint
+  namespace: bucket-review
+  labels:
+    app: awscli
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -eu
+    set -o pipefail
+
+    case "${BUCKET_PORT}"
+    in
+      80)
+        BUCKET_PROTO=http
+        ;;
+      443)
+        BUCKET_PROTO=https
+        ;;
+      *)
+        exit -1
+        ;;
+    esac
+
+    ENDPOINT="${BUCKET_PROTO}://${BUCKET_HOST}:${BUCKET_PORT}"
+
+    while
+      date
+      echo "==> Listing bucket <=="
+      aws s3 ls s3://${BUCKET_NAME}/${PREFIX} --endpoint-url "${ENDPOINT}" --recursive --summarize --human-readable
+    do
+      if [ ${COUNT} -lt ${MAX} ]
+      then
+        OBJECT=$(printf "%s-%03d" "object" "${COUNT}")
+        echo "==> Copying '${OBJECT}' to S3 bucket <=="
+        dd if=/dev/urandom bs=${BLOCK_SIZE} count=${COUNT} | \
+          aws s3 cp - s3://${BUCKET_NAME}/${PREFIX}/${OBJECT} --endpoint-url "${ENDPOINT}"
+        THRESHOLD=$((${OFFSET}*${STEP}))
+        if [ ${COUNT} -gt ${THRESHOLD} ]
+        then
+          OBJECT=$(printf "%s-%03d" "object" "$((${COUNT}-${THRESHOLD}))")
+          echo "==> Reading '${OBJECT}' from S3 bucket <=="
+          aws s3 cp s3://${BUCKET_NAME}/${PREFIX}/${OBJECT} - --endpoint-url "${ENDPOINT}" | \
+            md5sum - | \
+            awk -v name="${OBJECT}" '{print $1 "\t" name}'
+        fi
+        COUNT=$((${COUNT}+${STEP}))
+      fi
+      sleep ${SECS}
+      printf "%s\n" "--"
+    done

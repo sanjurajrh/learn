@@ -1,0 +1,9 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: this is a wrong name
+spec:
+  volumeSnapshotClassName: ocs-storagecluster-rbdplugin-snapclass
+  source:
+    persistentVolumeClaimName: wrong PVC

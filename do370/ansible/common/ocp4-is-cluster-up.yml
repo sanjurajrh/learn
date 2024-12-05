@@ -1,0 +1,15 @@
+---
+- name: Check if OpenShift Cluster is up
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+  roles:
+    - role: ocp-cluster-up-ready
+    - role: ocp-check-login
+      ocp_host: "{{ ocp_cluster['host'] }}"
+      ocp_users: "{{ ocp_cluster['users'] }}"

@@ -1,0 +1,260 @@
+---
+apiVersion: project.openshift.io/v1
+kind: Project
+metadata:
+  name: stateful
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:anyuid
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+- kind: ServiceAccount
+  name: mariadb
+  namespace: stateful
+- kind: ServiceAccount
+  name: wordpress
+  namespace: stateful
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:scc:restricted
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:restricted
+subjects:
+- kind: ServiceAccount
+  name: mariadb
+  namespace: stateful
+- kind: ServiceAccount
+  name: wordpress
+  namespace: stateful
+---
+# MariaDB
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb
+  namespace: stateful
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb
+  namespace: stateful
+data:
+  MYSQL_DATABASE: wordpress
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb
+  namespace: stateful
+stringData:
+  MYSQL_USER: exampleuser
+  MYSQL_PASSWORD: examplepass
+  MYSQL_ROOT_PASSWORD: mysql
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb
+  namespace: stateful
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: ocs-storagecluster-ceph-rbd
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: stateful
+  labels:
+    app: mariadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+      - image: quay.io/redhattraining/mariadb:10.5
+        name: mariadb
+        ports:
+        - containerPort: 3306
+        resources: {}
+        envFrom:
+        - configMapRef:
+            name: mariadb
+        - secretRef:
+            name: mariadb
+        volumeMounts:
+        - name: mariadb
+          mountPath: "/var/lib/mysql"
+      volumes:
+      - name: mariadb
+        persistentVolumeClaim:
+          claimName: mariadb
+      securityContext: {}
+      serviceAccount: mariadb
+      serviceAccountName: mariadb
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: stateful
+  labels:
+    app: mariadb
+spec:
+  ports:
+  - name: mariadb
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: mariadb
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+# WordPress
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wordpress
+  namespace: stateful
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress
+  namespace: stateful
+data:
+  WORDPRESS_DB_HOST: mariadb
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_EMAIL: wordpress@localhost.local
+  WORDPRESS_TITLE: "WordPress"
+  WORDPRESS_URL: "https://wordpress-stateful.apps.ocp4.example.com"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wordpress
+  namespace: stateful
+stringData:
+  WORDPRESS_USER: admin
+  WORDPRESS_PASSWORD: wordpress
+  WORDPRESS_DB_USER: exampleuser
+  WORDPRESS_DB_PASSWORD: examplepass
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress
+  namespace: stateful
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: ocs-storagecluster-cephfs
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  namespace: stateful
+  labels:
+    app: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      initContainers:
+      - name: sleep
+        image: quay.io/redhattraining/wordpress:5.7-php7.4-apache
+        command:
+        - /bin/sleep
+        - "15"
+      containers:
+      - name: wordpress
+        image: quay.io/redhattraining/wordpress:5.7-php7.4-apache
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        resources: {}
+        envFrom:
+        - configMapRef:
+            name: wordpress
+        - secretRef:
+            name: wordpress
+        volumeMounts:
+        - name: wordpress
+          mountPath: "/var/www/html"
+      volumes:
+      - name: wordpress
+        persistentVolumeClaim:
+          claimName: wordpress
+      securityContext: {}
+      serviceAccount: wordpress
+      serviceAccountName: wordpress
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  namespace: stateful
+  labels:
+    app: wordpress
+spec:
+  ports:
+  - name: wordpress
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: wordpress
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: wordpress
+  namespace: stateful
+  labels:
+    app: wordpress
+spec:
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: wordpress
+    weight: null

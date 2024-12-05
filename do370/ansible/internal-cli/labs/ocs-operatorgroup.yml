@@ -1,0 +1,9 @@
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: CHANGE_ME
+  namespace: CHANGE_ME
+spec:
+  targetNamespaces:
+    - CHANGE_ME

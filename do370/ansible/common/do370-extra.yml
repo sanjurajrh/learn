@@ -1,0 +1,54 @@
+---
+- name: Adjust DO370 environment
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+
+  tasks:
+    - name: Wait for the kube-apiserver cluster operator to finish progressing
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterOperator
+        name: kube-apiserver
+      register: kube_apiserver
+      retries: 180
+      delay: 5
+      until: "'False' in kube_apiserver['resources'][0]['status'] | json_query('conditions[?type==`Progressing`].status')"
+
+    - name: Check if the OLM packageserver cluster operator is progressing
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterOperator
+        name: operator-lifecycle-manager-packageserver
+      register: olm_packageserver
+
+    - name: Show OLM packageserver status
+      debug:
+        var: olm_packageserver['resources'][0]['status'] | json_query('conditions[?type==`Progressing`].status')
+
+    - name: Identify packageserver pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: openshift-operator-lifecycle-manager
+        label_selectors:
+          - app = packageserver
+      register: packageserver_pods
+      when: "'True' in olm_packageserver['resources'][0]['status'] | json_query('conditions[?type==`Progressing`].status')"
+
+    - name: Delete packageserver pods
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Pod
+        namespace: openshift-operator-lifecycle-manager
+        name: "{{ item['metadata']['name'] }}"
+        state: absent
+      loop: "{{ packageserver_pods['resources'] }}"
+      loop_control:
+        label: "Deleting pod '{{ item['metadata']['name'] }}'"
+      when: packageserver_pods['resources'] is defined

@@ -1,0 +1,9 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: backup-bucket
+  namespace: CHANGE_ME
+spec:
+  generateBucketName: backup-bucket
+  storageClassName: CHANGE_ME

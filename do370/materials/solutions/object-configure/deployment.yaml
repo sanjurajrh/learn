@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: image-tool-s3-obc
+  name: image-tool-s3-obc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-tool-s3-obc
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: image-tool-s3-obc
+    spec:
+      containers:
+      - name: image-tool-s3-obc
+        image: quay.io/redhattraining/image-tool:latest
+        ports:
+        - containerPort: 5000
+        resources: {}
+        env:
+          - name: AWS_CA_BUNDLE
+            value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        envFrom:
+        - configMapRef:
+            name: image-tool-obc
+        - secretRef:
+            name: image-tool-obc
+      securityContext: {}
+      serviceAccount: image-tool
+      serviceAccountName: image-tool

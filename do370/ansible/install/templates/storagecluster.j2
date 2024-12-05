@@ -1,0 +1,27 @@
+apiVersion: ocs.openshift.io/v1
+kind: StorageCluster
+metadata:
+  name: {{ hostvars['utility']['storagecluster_name'] | default(storagecluster['name']) }}
+  namespace: {{ hostvars['utility']['storagecluster_namespace'] | default(storagecluster['namespace']) }}
+spec:
+{% if hostvars['utility']['storagecluster_encryption'] | default(False) %}
+  encryption:
+    enable: true
+{% endif %}
+  monDataDirHostPath: /var/lib/rook
+  storageDeviceSets:
+  - count: {{ storagecluster['storageDeviceSets']['count'] }}
+    dataPVCTemplate:
+      spec:
+        accessModes:
+{% for mode in storagecluster['storageDeviceSets']['accessModes'] %}
+        - {{ mode }}
+{% endfor %}
+        resources:
+          requests:
+            storage: "{{ storagecluster['storageDeviceSets']['storage'] }}"
+        storageClassName: {{ hostvars['utility']['storageclass_name'] | default(localvolumeset['storageClassName']) }}
+        volumeMode: Block
+    name: ocs-deviceset-{{ hostvars['utility']['volumeset_name'] | default(localvolumeset['name']) }}
+    replica: {{ storagecluster['replica'] }}
+  version: {{ storagecluster['version'] }}

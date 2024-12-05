@@ -1,0 +1,16 @@
+---
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: wordpress-stateful
+  namespace: CHANGE_ME
+spec:
+  backupName: CHANGE_ME
+  restorePVs: true
+  excludedResources:
+  - nodes
+  - events
+  - events.events.k8s.io
+  - backups.velero.io
+  - restores.velero.io
+  - resticrepositories.velero.io

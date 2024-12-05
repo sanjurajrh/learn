@@ -1,0 +1,229 @@
+---
+- name: Install and populate database applications
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  vars:
+    exercise: "{{ volumes_block }}"
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+
+  tasks:
+    - name: Create exercise namespace
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/namespace.j2') }}"
+
+    - name: Encode secret
+      debug:
+        msg: "{{ item['key'] }}: {{ item['value'] | b64encode }}"
+      loop: "{{ exercise['secret']['data'] }}"
+      loop_control:
+        label: Creating secret line
+      register: secret_data
+
+    - name: Create exercise secret
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/opaque-secret.j2') }}"
+
+    - name: Create the PVCs
+      vars:
+        application: "{{ item }}"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/pvc.j2') }}"
+      loop:
+        - "{{ volumes_block['no_expand'] }}"
+        - "{{ volumes_block['expand'] }}"
+      loop_control:
+        label: Creating PVC "{{ application['pvc']['name'] }}"
+
+    - name: Create the deployments
+      vars:
+        application: "{{ item }}"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/deployment.j2') }}"
+      loop:
+        - "{{ volumes_block['no_expand'] }}"
+        - "{{ volumes_block['expand'] }}"
+      loop_control:
+        label: Creating deployment "{{ application['name'] }}"
+      register: create_deployments
+
+    - name: Identify the no-expand pod
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ exercise['namespace']['name'] }}"
+        label_selectors:
+          - deployment = {{ application['name'] }}
+      register: pod_no_expand
+      retries: 30
+      delay: 2
+      until:
+        - pod_no_expand['resources'] | length > 0
+        - pod_no_expand['resources'][0]['status']['phase'] is defined
+        - pod_no_expand['resources'][0]['status']['phase'] == "Running"
+
+    - name: Identify the expand pod
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ exercise['namespace']['name'] }}"
+        label_selectors:
+          - deployment = {{ application['name'] }}
+      register: pod_expand
+      retries: 30
+      delay: 2
+      until:
+        - pod_expand['resources'] | length > 0
+        - pod_expand['resources'][0]['status']['phase'] is defined
+        - pod_expand['resources'][0]['status']['phase'] == "Running"
+
+    - name: Create the services
+      vars:
+        application: "{{ item }}"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/service-deployment.j2') }}"
+      loop:
+        - "{{ volumes_block['no_expand'] }}"
+        - "{{ volumes_block['expand'] }}"
+      loop_control:
+        label: Creating service "{{ application['name'] }}"
+
+    - name: Copy sql files to /tmp
+      vars:
+        application: "{{ item }}"
+      copy:
+        src: "{{ application['database']['sql_file'] }}"
+        dest: /tmp/{{ application['database']['sql_file'] }}
+      loop:
+        - "{{ volumes_block['no_expand'] }}"
+        - "{{ volumes_block['expand'] }}"
+      loop_control:
+        label: Copying {{ application['database']['sql_file'] }} to /tmp/{{ application['database']['sql_file'] }}
+
+    - name: Check if sql file exists on no-expand pod
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_no_expand['resources'][0]['metadata']['name'] }}"
+        command: "ls /tmp"
+      register: no_expand_sql_file
+      changed_when: False
+
+    - name: Copy sql_file to no-expand pod
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      shell: "oc cp /tmp/{{ application['database']['sql_file'] }} -n {{ exercise['namespace']['name'] }} {{ pod_no_expand['resources'][0]['metadata']['name'] }}:/tmp/{{ application['database']['sql_file'] }}"
+      when: application['database']['sql_file'] not in no_expand_sql_file['stdout_lines']
+
+    - name: Check if sql file exists on expand pod
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_expand['resources'][0]['metadata']['name'] }}"
+        command: "ls /tmp"
+      register: expand_sql_file
+      changed_when: False
+
+    - name: Copy sql_file to expand pod
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      shell: "oc cp /tmp/{{ application['database']['sql_file'] }} -n {{ exercise['namespace']['name'] }} {{ pod_expand['resources'][0]['metadata']['name'] }}:/tmp/{{ application['database']['sql_file'] }}"
+      when: application['database']['sql_file'] not in expand_sql_file['stdout_lines']
+
+    - name: Pausing 10 seconds for the no-expand pod
+      pause:
+        seconds: 10
+      when: create_deployments['changed']
+
+    - name: Select no-expand database content
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_no_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root -e "SELECT * FROM {{ application['database']['name'] }}.{{ application['database']['table'] }};"
+      register: no_expand_db_content
+      changed_when: false
+
+    - name: Populate the no-expand database
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_no_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root {{ application['database']['name'] }} -e "source /tmp/{{ application['database']['sql_file'] }}"
+      register: populate_no_expand
+      when: "'exist' in no_expand_db_content['stderr']"
+
+    - name: Verify loaded no-expand database content
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_no_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root -e "SELECT * FROM {{ application['database']['name'] }}.{{ application['database']['table'] }};"
+      register: no_expand_db_verify
+      changed_when: false
+
+    - name: Fail if no-expand database content is not accessible
+      vars:
+        application: "{{ volumes_block['no_expand'] }}"
+      fail:
+        msg: "{{ application['database']['name'] }}.{{ application['database']['table'] }} content is not accessible"
+      when: "'exist' in no_expand_db_verify['stderr']"
+
+    - name: Pausing 20 seconds for the expand pod
+      pause:
+        seconds: 20
+      when: create_deployments['changed']
+
+    - name: Select expand database content
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root -e "SELECT * FROM {{ application['database']['name'] }}.{{ application['database']['table'] }};"
+      register: expand_db_content
+      changed_when: false
+
+    - name: Populate the expand database
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root {{ application['database']['name'] }} -e "source /tmp/{{ application['database']['sql_file'] }}"
+      register: populate_expand
+      when: "'exist' in expand_db_content['stderr']"
+
+    - name: Verify loaded expand database content
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ exercise['namespace']['name'] }}"
+        pod: "{{ pod_expand['resources'][0]['metadata']['name'] }}"
+        command: /usr/bin/mysql -u root -e "SELECT * FROM {{ application['database']['name'] }}.{{ application['database']['table'] }};"
+      register: expand_db_verify
+      changed_when: false
+
+    - name: Fail if expand database content is not accessible
+      vars:
+        application: "{{ volumes_block['expand'] }}"
+      fail:
+        msg: "{{ application['database']['name'] }}.{{ application['database']['table'] }} content is not accessible"
+      when: "'exist' in expand_db_verify['stderr']"
+

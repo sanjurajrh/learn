@@ -1,0 +1,9 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: my-object-bucket-claim
+  namespace: obc-practice
+spec:
+  storageClassName: openshift-storage.noobaa.io
+  generateBucketName: bucket-claim-noobaa

@@ -1,0 +1,34 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: compreview-file
+  name: compreview-file
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: compreview-file
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: compreview-file
+    spec:
+      containers:
+      - name: compreview-file
+        image: quay.io/redhattraining/image-tool:latest
+        ports:
+        - containerPort: 5000
+        resources: {}
+        volumeMounts:
+#        - name: wrong-name
+#          mountPath: CHANGE_ME
+#      volumes:
+#      - name: -
+#        persistentVolumeClaim:
+#          claimName: CHANGE_ME
+      securityContext: {}
+      serviceAccount: image-tool
+      serviceAccountName: image-tool

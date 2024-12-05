@@ -1,0 +1,63 @@
+---
+- name: Install and configure the OpenShift Container Storage operator
+  hosts: utility
+  remote_user: lab
+  gather_facts: False
+  module_defaults:
+    group/k8s:
+      host: "{{ ocp_cluster['host'] }}"
+      kubeconfig: "{{ ocp_cluster['kubeconfig'] }}"
+      validate_certs: "{{ ocp_cluster['validate_certs'] }}"
+
+  roles:
+    - role: ocp-install-operator
+      operator: "{{ operators['ocs'] }}"
+
+  tasks:
+    # Check to see if a storage cluster resource already exists.
+    # Because students can accidentally the resource using the
+    # wrong name, use the name of the existing resource if it exists.
+    - name: Identify if a storage cluster resource already exists
+      kubernetes.core.k8s_info:
+        api_version: ocs.openshift.io/v1
+        kind: StorageCluster
+        namespace: "{{ storagecluster['namespace'] }}"
+      register: storagecluster_exists
+
+    - name: Set facts for existing storage cluster
+      set_fact:
+        cacheable: True
+        storagecluster_name: "{{ storagecluster_exists['resources'][0]['metadata']['name'] }}"
+        storagecluster_namespace: "{{ storagecluster_exists['resources'][0]['metadata']['namespace'] }}"
+      when:
+        - storagecluster_exists['resources'] | length > 0
+        - storagecluster_exists['resources'][0]['metadata']['name'] is defined
+
+    - name: Set encryption fact for existing storage cluster
+      set_fact:
+        cacheable: True
+        storagecluster_encryption: "{{ storagecluster_exists['resources'][0]['spec']['encryption']['enable'] }}"
+      when:
+        - storagecluster_exists['resources'] | length > 0
+        - storagecluster_exists['resources'][0]['spec']['encryption']['enable'] is defined
+
+    - name: Create storage cluster "{{ hostvars['localhost']['storagecluster_name'] | default(storagecluster['name']) }}"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'templates/storagecluster.j2') }}"
+      register: create_storagecluster
+
+    - name: Wait up to 8 minutes for creation of storage cluster "{{ hostvars['localhost']['storagecluster_name'] | default(storagecluster['name']) }}"
+      kubernetes.core.k8s_info:
+        api_version: ocs.openshift.io/v1
+        kind: StorageCluster
+        name: "{{ create_storagecluster['result']['metadata']['name'] }}"
+        namespace: "{{ create_storagecluster['result']['metadata']['namespace'] }}"
+      register: storagecluster_ready
+      retries: 96
+      delay: 5
+      until:
+        - storagecluster_ready['resources'] | length > 0
+        - storagecluster_ready['resources'][0]['status']['phase'] is defined
+        - storagecluster_ready['resources'][0]['status']['phase'] == "Ready"
+      when: create_storagecluster['changed']

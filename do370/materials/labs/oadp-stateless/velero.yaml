@@ -1,0 +1,36 @@
+---
+apiVersion: konveyor.openshift.io/v1alpha1
+kind: Velero
+metadata:
+  name: velero
+  namespace: oadp-operator
+spec:
+  olm_managed: true
+  enable_csi_plugin: true
+  use_upstream_images: false
+  enable_restic: false
+  velero_feature_flags: EnableCSI
+  default_velero_plugins:
+    - aws
+    - csi
+    - openshift
+  backup_storage_locations:
+    - name: default
+      config:
+        profile: default
+        region: BUCKET_REGION
+        s3_url: http://rook-ceph-rgw-ocs-storagecluster-cephobjectstore.openshift-storage.svc.cluster.local:80
+        s3_force_path_style: true
+      credentials_secret_ref:
+        name: cloud-credentials
+        namespace: oadp-operator
+      object_storage:
+        bucket: BUCKET_NAME
+        prefix: velero
+      provider: aws
+  volume_snapshot_locations:
+  - name: default
+    config:
+      profile: default
+      region: BUCKET_REGION
+    provider: aws
